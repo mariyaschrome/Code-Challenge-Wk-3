@@ -1,5 +1,6 @@
 // Function to execute when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+
     // Set the URL fetching the data
     const baseURL = 'http://localhost:3000';
 
@@ -8,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return fetch(`${baseURL}/films`)
             // Show the response as JSON
             .then(res => res.json())
+            // Handle any  errors
+            .catch(error => console.error('Error fetching films:', error));
     }
    
 
@@ -15,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function fetchFilmById(id) {
         return fetch(`${baseURL}/films/${id}`)
             .then(res => res.json())
+            .catch(error => console.error('Error fetching films by  ID:', error));
     }
 
     // Function to update the ticket number for a film once a ticket is sold
@@ -28,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({ tickets_sold: newTicketNumber}),
         })
         .then(res => res.json())
+        .catch(error => console.error('Error updating ticket:', error));
     }
 
     // Function to create a new ticket
@@ -42,24 +47,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 "number_of_tickets":  numberOfTickets
             }),
         })
-        .then(res => res.json());
+        .then(res => res.json())
+        .catch(error => console.error('Error creating ticket:', error));
     }
 
     // Function to purchase tickets
     function purchaseTicket(filmId, ticketsSold, capacity) {
+        // Get the buy ticket button and set its variable
+        const buyTicketBtn = document.getElementById("buy-ticket");
+        //Get the element for the ticket number
+        const ticketNumberElement = document.getElementById('ticket-num');
+    
             // Use  of if conditional to return different responses
             if (ticketsSold < capacity) {
                 // Increment the count for tickets sold if there are still available tickets
                 let newTicketNumber = ticketsSold + 1;
+                // Update the frontend ticket number
+                ticketNumberElement.textContent = capacity - newTicketNumber;
+                // Send PATCH request
                 return updateTicketNumber(filmId, newTicketNumber)
                 .then(updatedFilm => {
                     if(updatedFilm) {
-                        return updatedFilm;
+                        // if all tickets are sold out disable buy ticket button
+                    if (updatedFilm.tickets_sold === capacity) {
+                        buyTicketBtn.textContent = "Sold Out";
+                        buyTicketBtn.disabled = true;
                     }
-                });
+                // Create a new ticket
+            return createTicket(filmId, 1)
+            .then(createdTicket => {
+                if (createdTicket) {
+                    console.log("Ticket purchased successfully:", createdTicket);
+                // Return updated film data
+                return updatedFilm;
+            }
+            });
+                
+        }
+                })
+                .catch(error => console.error('Update ticket number error:', error));
                 // If the film is sold out, notify the user using alert
-            } else if (ticketsSold === capacity) {
-                return alert("Film  is sold out!");
+            } else {
+                alert("Film  is sold out!");
+                return Promise.resolve();
             }
     };
 
@@ -74,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 filmItem.remove();
             }
         })
+        .catch(error => console.error('Error deleting film:', error))
     } 
 
     // Function to show the films menu
@@ -85,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 filmMenu.innerHTML = "";
 
                 // Iterate over each film using forEach and create list items
-                films.forEach( film => {
+                films.forEach( (film, index) => {
                     let filmItem = document.createElement("li");
                     filmItem.id = `film-${film.id}`;
                     filmItem.classList.add("film", "item")
@@ -94,22 +125,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     filmItem.addEventListener("click", () => {
                         fetchFilmById(film.id)
                         // Show details of the selected film
-                        .then(selectedFilm => filmDetails(selectedFilm));
+                        .then(selectedFilm => filmDetails(selectedFilm))
+                        .catch (error => console.error('Fetch film by ID error:', error));
                     });
 
                     // Show  the delete button next to each film
                     let deleteButton = document.createElement("button");
                     deleteButton.textContent = "Delete";
                     deleteButton.addEventListener("click", () => {
-                        deleteFilm(film.id);
+                        deleteFilm(film.id)
+                        .catch (error => console.error('Delete film error:', error));
                     });
                     // Append delete button to each film in the film menu
                     filmItem.appendChild(deleteButton);
 
                     // Append film item to the film menu
                     filmMenu.appendChild(filmItem);
+
+                    // Display the first film details by default
+                    if (index === 0) {
+                        fetchFilmById(film.id)
+                        .then(selectedFilm => filmDetails(selectedFilm))
+                        .catch(error => console.error('Error fetching film by ID:', error));
+                    }
                 });
-            });
+            })
+            .catch(error => console.error('Error fetching films:', error));
     };
 
 
@@ -144,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add an onclick event handler to the button
             buyTicketBtn.onclick = () => {
             // Purchase a ticket for the selected film
-            purchaseTicket(film.id, film.tickets_sold, film.capacity)
+            purchaseTicket(film.id, film.tickets_sold, film.capacity, ticketNumberElement, buyTicketBtn)
             .then(updatedFilm => {
             // Use the if conditional to update the ticket purchase information
                 if (updatedFilm) {
@@ -157,11 +198,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ticketNumberElement.textContent = "Sold Out"
             } else if (remainingTickets === 0) {
                 // If all the tickets are sold out notify the user and disable the button
-                buyTicketBtn.textContent = "Sold Out";
-                buyTicketBtn.disabled = true;
+                ticketNumberElement.textContent = "Sold Out";
             }
         }
-    });
+    })
+    .catch(error => console.error('Ticket purchase error:', error));
         };
 };
 // Call the function to fetch and display
